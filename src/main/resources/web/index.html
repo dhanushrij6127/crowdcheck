@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrowdCheck – Live crowd monitoring</title>
+<style>
+:root{
+  --bg:#f4f8fb; --card:#ffffff; --text:#25364a; --muted:#7b8ca3; --line:#e2eaf2; --primary:#3f8fd9; --primary-soft:#e6f1fb;
+  --low:#4caf8a; --mod:#f2b94b; --high:#f08a4b; --crit:#e5534b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+header{background:#fff;border-bottom:1px solid var(--line);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.logo{font-size:21px;font-weight:700;color:var(--primary)}
+.logo small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.who{display:flex;align-items:center;gap:8px;color:var(--muted)}
+nav{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;display:flex;gap:4px;overflow-x:auto}
+nav button{border:0;background:none;padding:12px 16px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent}
+nav button:hover{color:var(--text)}
+nav button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+main{max-width:1120px;margin:22px auto;padding:0 18px}
+section[hidden]{display:none}
+h2{margin:0 0 12px;font-size:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.kpis{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi b{display:block;font-size:26px;line-height:1.2}
+.kpi span{color:var(--muted);font-size:13px}
+.muted{color:var(--muted)}
+input,select,button{font:inherit}
+input,select{border:1px solid #cfdae6;border-radius:8px;padding:8px 10px;background:#fff;color:var(--text)}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.btn{border:0;border-radius:8px;padding:8px 14px;background:var(--primary);color:#fff;cursor:pointer}
+.btn:hover{background:#2f7fc9}
+.btn.ghost{background:var(--primary-soft);color:var(--primary)}
+.btn.ghost:hover{background:#d5e8f8}
+.btn.danger{background:#fdecea;color:var(--crit)}
+.btn.danger:hover{background:#fbd9d6}
+.btn.small{padding:5px 10px;font-size:13px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.bar .grow{flex:1;min-width:180px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:13px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid #eef3f8;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.wrap{overflow-x:auto}
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12.5px;font-weight:600}
+.LOW{background:#dff5ec;color:#1f8a63}.MODERATE{background:#fdf1d4;color:#8f6500}
+.HIGH{background:#fde4d2;color:#b4531a}.CRITICAL{background:#fbdcda;color:#b3261e}
+.ACTIVE{background:#fbdcda;color:#b3261e}.ACKNOWLEDGED{background:#fdf1d4;color:#8f6500}.RESOLVED{background:#dff5ec;color:#1f8a63}
+.track{background:#edf2f7;border-radius:6px;height:10px;overflow:hidden;min-width:90px}
+.fill{height:100%;border-radius:6px}
+.bgLOW{background:var(--low)}.bgMODERATE{background:var(--mod)}.bgHIGH{background:var(--high)}.bgCRITICAL{background:var(--crit)}
+.barrow{display:grid;grid-template-columns:150px 1fr 120px;gap:12px;align-items:center;margin:9px 0}
+.barrow .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.donutbox{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.donut{width:170px;height:170px;border-radius:50%;position:relative;flex:none}
+.donut::after{content:"";position:absolute;inset:30px;background:#fff;border-radius:50%}
+.donut div{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut b{font-size:28px;line-height:1}
+.legend div{display:flex;align-items:center;gap:8px;margin:5px 0}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.tag{display:inline-block;font-size:12px;color:var(--muted);background:#f0f4f8;border-radius:6px;padding:1px 7px;margin-left:6px}
+.form{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.form label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:3px}
+.num{width:90px}
+.trend{width:100%;height:auto}
+.best li{margin:6px 0}
+#toast{position:fixed;right:20px;bottom:20px;background:#25364a;color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:340px}
+#toast.show{opacity:1}#toast.err{background:var(--crit)}
+/* role based visibility */
+body[data-role="VISITOR"] .staff,
+body[data-role="STAFF"] .mgr,body[data-role="VISITOR"] .mgr,
+body:not([data-role="ADMIN"]) .adm{display:none!important}
+@media(max-width:640px){.barrow{grid-template-columns:100px 1fr 90px}}
+</style>
+</head>
+<body data-role="VISITOR">
+
+<header>
+  <div class="logo">CrowdCheck<small>Live crowd monitoring for campus and events</small></div>
+  <div class="who">Viewing as
+    <select id="me" onchange="switchUser()"></select>
+    <span id="roleBadge" class="badge LOW"></span>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-t="dash" class="on">Dashboard</button>
+  <button data-t="locs">Locations</button>
+  <button data-t="alerts">Alerts</button>
+  <button data-t="hist">History &amp; analysis</button>
+  <button data-t="users">Users</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="card"><h2>Locations by crowd level</h2>
+        <div class="donutbox"><div class="donut" id="donut"><div><b id="donutN">0</b><span class="muted">locations</span></div></div>
+        <div class="legend" id="legend"></div></div>
+      </div>
+      <div class="card"><h2>Less crowded right now</h2><ul class="best" id="best" style="padding-left:18px;margin:0"></ul></div>
+    </div>
+    <div class="card"><h2>How full is each location?</h2><div id="bars"></div></div>
+  </section>
+
+  <!-- LOCATIONS -->
+  <section id="locs" hidden>
+    <div class="bar">
+      <input id="q" class="grow" placeholder="Search by name or type, e.g. food court" oninput="debounce(drawLocs)">
+      <button class="btn mgr" onclick="openForm()">Add location</button>
+    </div>
+    <div class="card mgr" id="locForm" hidden>
+      <h2 id="formTitle">Add location</h2>
+      <div class="form">
+        <label>Name<input id="fName" placeholder="e.g. Library Gate"></label>
+        <label>Type<select id="fType"><option>ENTRANCE</option><option>FOOD_COURT</option><option>AUDITORIUM</option><option>PARKING</option></select></label>
+        <label>Maximum capacity<input id="fCap" type="number" min="1" class="num"></label>
+        <button class="btn" onclick="saveLoc()">Save location</button>
+        <button class="btn ghost" onclick="closeForm()">Cancel</button>
+      </div>
+    </div>
+    <div class="card wrap"><table>
+      <thead><tr><th>Location</th><th>Crowd</th><th>Filled</th><th>Level</th><th>Last updated</th><th class="staff">Actions</th></tr></thead>
+      <tbody id="locBody"></tbody></table></div>
+  </section>
+
+  <!-- ALERTS -->
+  <section id="alerts" hidden>
+    <div class="bar"><label>Show <select id="alertFilter" onchange="drawAlerts()">
+      <option value="ALL">All alerts</option><option value="ACTIVE" selected>Active</option><option value="ACKNOWLEDGED">Acknowledged</option><option value="RESOLVED">Resolved</option></select></label></div>
+    <div class="card wrap"><table>
+      <thead><tr><th>Message</th><th>Level</th><th>Time</th><th>Status</th><th class="staff">Action</th></tr></thead>
+      <tbody id="alertBody"></tbody></table></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="hist" hidden>
+    <div class="card"><h2>Which locations get overcrowded most often?</h2>
+      <div class="wrap"><table><thead><tr><th>Location</th><th>Updates</th><th>High / critical</th><th>Peak count</th><th>Overcrowded share</th></tr></thead>
+      <tbody id="analysisBody"></tbody></table></div></div>
+    <div class="card"><div class="bar"><h2 style="margin:0">Crowd history</h2>
+      <select id="histLoc" onchange="drawHist()"></select></div>
+      <div id="trend"></div>
+      <div class="wrap"><table><thead><tr><th>Time</th><th>Location</th><th>Count</th><th>Filled</th><th>Level</th><th>Updated by</th></tr></thead>
+      <tbody id="histBody"></tbody></table></div></div>
+  </section>
+
+  <!-- USERS -->
+  <section id="users" hidden>
+    <div class="card adm"><h2>Add user</h2><div class="form">
+      <label>Name<input id="uName"></label><label>Email<input id="uEmail" type="email"></label>
+      <label>Contact<input id="uContact"></label>
+      <label>Role<select id="uRole"><option>VISITOR</option><option>STAFF</option><option>ORGANIZER</option><option>ADMIN</option></select></label>
+      <button class="btn" onclick="addUser()">Add user</button></div></div>
+    <div class="card wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Contact</th><th>Role</th></tr></thead><tbody id="userBody"></tbody></table>
+    <p class="muted" style="margin-bottom:0">Roles: Admin manages everything. Organizer manages locations. Staff update crowd counts and alerts. Visitors view only.</p></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const LV = {LOW:'#4caf8a', MODERATE:'#f2b94b', HIGH:'#f08a4b', CRITICAL:'#e5534b'};
+let users = [], me = null, allLocs = [], locs = [], cur = 'dash', editId = null, timer;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const badge = l => `<span class="badge ${l}">${l}</span>`;
+const pretty = t => t.replace('_', ' ').toLowerCase();
+const debounce = fn => { clearTimeout(timer); timer = setTimeout(fn, 250); };
+
+async function api(path, method = 'GET', body) {
+  const opt = {method, headers: {'Content-Type': 'application/json'}};
+  if (method !== 'GET') opt.body = JSON.stringify({...(body || {}), actorId: me ? me.userId : 0});
+  const r = await fetch('/api/' + path, opt);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Something went wrong');
+  return d;
+}
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  setTimeout(() => t.className = '', 3000);
+}
+async function run(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg); } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- navigation & user ---------- */
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => show(b.dataset.t));
+function show(t) {
+  cur = t;
+  document.querySelectorAll('main section').forEach(s => s.hidden = s.id !== t);
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  refresh();
+}
+async function loadUsers() {
+  users = await api('users');
+  const saved = +localStorage.getItem('cc_user');
+  me = users.find(u => u.userId === saved) || users[0];
+  $('#me').innerHTML = users.map(u => `<option value="${u.userId}" ${u.userId === me.userId ? 'selected' : ''}>${esc(u.userName)}</option>`).join('');
+  applyRole();
+}
+function switchUser() {
+  me = users.find(u => u.userId === +$('#me').value);
+  localStorage.setItem('cc_user', me.userId);
+  applyRole(); refresh();
+}
+function applyRole() {
+  document.body.dataset.role = me.userRole;
+  const b = $('#roleBadge'); b.textContent = me.userRole.toLowerCase();
+  b.className = 'badge ' + ({ADMIN:'CRITICAL', ORGANIZER:'HIGH', STAFF:'MODERATE', VISITOR:'LOW'}[me.userRole]);
+}
+
+async function refresh() {
+  await run(async () => {
+    allLocs = await api('locations');
+    if (cur === 'dash') await drawDash();
+    if (cur === 'locs') await drawLocs();
+    if (cur === 'alerts') await drawAlerts();
+    if (cur === 'hist') await drawHistPage();
+    if (cur === 'users') drawUsers();
+  });
+}
+
+/* ---------- dashboard ---------- */
+async function drawDash() {
+  const counts = {LOW:0, MODERATE:0, HIGH:0, CRITICAL:0};
+  allLocs.forEach(l => counts[l.crowdLevel]++);
+  const people = allLocs.reduce((s, l) => s + l.currentCrowdCount, 0);
+  const active = (await api('alerts?status=ACTIVE')).length;
+  const sorted = [...allLocs].sort((a, b) => b.percent - a.percent);
+  const busiest = sorted[0];
+  $('#kpis').innerHTML = `
+    <div class="kpi"><b>${allLocs.length}</b><span>Locations monitored</span></div>
+    <div class="kpi"><b>${people.toLocaleString()}</b><span>People counted right now</span></div>
+    <div class="kpi"><b style="color:${active ? LV.CRITICAL : LV.LOW}">${active}</b><span>Active alerts</span></div>
+    <div class="kpi"><b>${busiest ? busiest.percent + '%' : '-'}</b><span>Busiest: ${busiest ? esc(busiest.locationName) : 'none yet'}</span></div>`;
+
+  const total = allLocs.length; let acc = 0, parts = [];
+  Object.keys(LV).forEach(k => { const p = total ? counts[k] / total * 100 : 0; if (p > 0) { parts.push(`${LV[k]} ${acc}% ${acc + p}%`); acc += p; } });
+  $('#donut').style.background = parts.length ? `conic-gradient(${parts.join(',')})` : '#e2eaf2';
+  $('#donutN').textContent = total;
+  $('#legend').innerHTML = Object.keys(LV).map(k => `<div><span class="dot" style="background:${LV[k]}"></span>${k.toLowerCase()} <b>${counts[k]}</b></div>`).join('');
+
+  const best = [...allLocs].sort((a, b) => a.percent - b.percent).slice(0, 4);
+  $('#best').innerHTML = best.map(l => `<li><b>${esc(l.locationName)}</b> <span class="tag">${pretty(l.locationType)}</span><br><span class="muted">${l.percent}% full, ${l.currentCrowdCount} of ${l.capacity} people</span></li>`).join('') || '<li class="muted">No locations yet. Add one on the Locations tab.</li>';
+
+  $('#bars').innerHTML = sorted.map(l => `
+    <div class="barrow"><div class="nm" title="${esc(l.locationName)}">${esc(l.locationName)}</div>
+    <div class="track" style="height:16px"><div class="fill bg${l.crowdLevel}" style="width:${Math.min(l.percent, 100)}%"></div></div>
+    <div>${l.percent}% ${badge(l.crowdLevel)}</div></div>`).join('') || '<p class="muted">Nothing to show yet.</p>';
+}
+
+/* ---------- locations ---------- */
+async function drawLocs() {
+  const q = $('#q').value.trim();
+  locs = await api('locations' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  $('#locBody').innerHTML = locs.map(l => `<tr>
+    <td><b>${esc(l.locationName)}</b><span class="tag">${pretty(l.locationType)}</span></td>
+    <td>${l.currentCrowdCount} / ${l.capacity}</td>
+    <td style="min-width:130px"><div class="track"><div class="fill bg${l.crowdLevel}" style="width:${Math.min(l.percent, 100)}%"></div></div><small class="muted">${l.percent}%</small></td>
+    <td>${badge(l.crowdLevel)}</td>
+    <td class="muted">${l.lastUpdated}</td>
+    <td style="white-space:nowrap">
+      <span class="staff"><input class="num" type="number" min="0" id="c${l.locationId}" value="${l.currentCrowdCount}">
+      <button class="btn small" onclick="setCount(${l.locationId})">Update</button></span>
+      <button class="btn small ghost mgr" onclick="openForm(${l.locationId})">Edit</button>
+      <button class="btn small danger mgr" onclick="delLoc(${l.locationId})">Delete</button></td></tr>`).join('')
+    || '<tr><td colspan="6" class="muted">No locations match your search.</td></tr>';
+}
+const setCount = id => run(async () => {
+  const l = await api(`locations/${id}/crowd`, 'POST', {count: +$('#c' + id).value});
+  toast(`${l.locationName} is now ${l.crowdLevel.toLowerCase()} (${l.percent}% full)`);
+  await drawLocs();
+});
+function openForm(id) {
+  editId = id || null;
+  const l = locs.find(x => x.locationId === id);
+  $('#formTitle').textContent = l ? 'Edit location' : 'Add location';
+  $('#fName').value = l ? l.locationName : '';
+  $('#fType').value = l ? l.locationType : 'ENTRANCE';
+  $('#fCap').value = l ? l.capacity : '';
+  $('#locForm').hidden = false; $('#fName').focus();
+}
+const closeForm = () => { $('#locForm').hidden = true; editId = null; };
+const saveLoc = () => run(async () => {
+  const body = {locationName: $('#fName').value, locationType: $('#fType').value, capacity: +$('#fCap').value};
+  if (editId) await api('locations/' + editId, 'PUT', body); else await api('locations', 'POST', body);
+  const msg = editId ? 'Location updated' : 'Location added';
+  closeForm(); await drawLocs(); toast(msg);
+});
+const delLoc = id => { if (confirm('Delete this location and its history?')) run(async () => { await api('locations/' + id, 'DELETE', {}); await drawLocs(); toast('Location deleted'); }); };
+
+/* ---------- alerts ---------- */
+async function drawAlerts() {
+  const list = await api('alerts?status=' + $('#alertFilter').value);
+  $('#alertBody').innerHTML = list.map(a => `<tr>
+    <td>${esc(a.alertMessage)}</td><td>${badge(a.crowdLevel)}</td><td class="muted">${a.alertTime}</td><td>${badge(a.status)}</td>
+    <td class="staff" style="white-space:nowrap">
+      ${a.status === 'ACTIVE' ? `<button class="btn small ghost" onclick="setAlert(${a.alertId},'ACKNOWLEDGED')">Acknowledge</button>` : ''}
+      ${a.status !== 'RESOLVED' ? `<button class="btn small" onclick="setAlert(${a.alertId},'RESOLVED')">Mark resolved</button>` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No alerts here. Alerts appear when a location reaches high or critical.</td></tr>';
+}
+const setAlert = (id, status) => run(async () => {
+  await api(`alerts/${id}/status`, 'POST', {status});
+  await drawAlerts(); toast(status === 'RESOLVED' ? 'Alert resolved' : 'Alert acknowledged');
+});
+
+/* ---------- history & analysis ---------- */
+async function drawHistPage() {
+  const sel = $('#histLoc'), keep = sel.value;
+  sel.innerHTML = '<option value="0">All locations</option>' + allLocs.map(l => `<option value="${l.locationId}">${esc(l.locationName)}</option>`).join('');
+  sel.value = keep || '0'; if (!sel.value) sel.value = '0';
+  const an = await api('analysis');
+  $('#analysisBody').innerHTML = an.map(a => `<tr><td><b>${esc(a.locationName)}</b></td><td>${a.totalUpdates}</td>
+    <td>${a.overcrowdedUpdates} <span class="muted">(${a.criticalUpdates} critical)</span></td><td>${a.peakCount} / ${a.capacity}</td>
+    <td style="min-width:170px"><div class="track"><div class="fill bg${a.overcrowdedPercent >= 60 ? 'CRITICAL' : a.overcrowdedPercent >= 30 ? 'HIGH' : 'LOW'}" style="width:${a.overcrowdedPercent}%"></div></div>
+    <small class="muted">${a.overcrowdedPercent}%${a.overcrowdedPercent >= 50 ? ' – frequently overcrowded' : ''}</small></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No data yet.</td></tr>';
+  await drawHist();
+}
+async function drawHist() {
+  const id = +$('#histLoc').value;
+  const rows = await api('history' + (id ? '?locationId=' + id : ''));
+  $('#trend').innerHTML = id ? trend(rows) : '<p class="muted">Pick a location to see its crowd trend over time.</p>';
+  $('#histBody').innerHTML = rows.map(u => `<tr><td class="muted">${u.updateTime}</td><td>${esc(u.locationName)}</td><td>${u.crowdCount}</td><td>${u.percent}%</td><td>${badge(u.crowdLevel)}</td><td>${esc(u.updatedBy)}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="muted">No updates recorded yet.</td></tr>';
+}
+function trend(rows) {
+  if (rows.length < 2) return '<p class="muted">Not enough updates to draw a trend yet. Update the count a few times.</p>';
+  const d = [...rows].reverse(), W = 700, H = 230, L = 40, R = 14, T = 10, B = 26, n = d.length;
+  const x = i => L + (W - L - R) * i / (n - 1), y = p => T + (H - T - B) * (1 - Math.min(p, 100) / 100);
+  const band = (a, b, c) => `<rect x="${L}" y="${y(b)}" width="${W - L - R}" height="${y(a) - y(b)}" fill="${c}" opacity=".13"/>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="trend">` + band(0, 40, LV.LOW) + band(40, 70, LV.MODERATE) + band(70, 90, LV.HIGH) + band(90, 100, LV.CRITICAL);
+  [0, 40, 70, 90, 100].forEach(v => s += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#7b8ca3">${v}%</text>`);
+  s += `<polyline fill="none" stroke="#3f8fd9" stroke-width="2.5" points="${d.map((u, i) => x(i) + ',' + y(u.percent)).join(' ')}"/>`;
+  d.forEach((u, i) => s += `<circle cx="${x(i)}" cy="${y(u.percent)}" r="5" fill="${LV[u.crowdLevel]}" stroke="#fff" stroke-width="2"><title>${u.updateTime}: ${u.crowdCount} people (${u.percent}%)</title></circle>`);
+  s += `<text x="${L}" y="${H - 6}" font-size="11" fill="#7b8ca3">${d[0].updateTime.slice(5, 16)}</text>`;
+  s += `<text x="${W - R}" y="${H - 6}" font-size="11" fill="#7b8ca3" text-anchor="end">${d[n - 1].updateTime.slice(5, 16)}</text></svg>`;
+  return s;
+}
+
+/* ---------- users ---------- */
+function drawUsers() {
+  const cls = {ADMIN:'CRITICAL', ORGANIZER:'HIGH', STAFF:'MODERATE', VISITOR:'LOW'};
+  $('#userBody').innerHTML = users.map(u => `<tr><td>${u.userId}</td><td>${esc(u.userName)}</td><td>${esc(u.email)}</td><td>${esc(u.contactInfo)}</td>
+    <td><span class="badge ${cls[u.userRole]}">${u.userRole.toLowerCase()}</span></td></tr>`).join('');
+}
+const addUser = () => run(async () => {
+  await api('users', 'POST', {userName: $('#uName').value, email: $('#uEmail').value, contactInfo: $('#uContact').value, userRole: $('#uRole').value});
+  ['uName', 'uEmail', 'uContact'].forEach(i => $('#' + i).value = '');
+  await loadUsers(); drawUsers(); toast('User added');
+});
+
+/* ---------- start ---------- */
+(async () => { await run(loadUsers); refresh(); })();
+setInterval(() => { if (!['INPUT', 'SELECT'].includes(document.activeElement.tagName)) refresh(); }, 10000);
+</script>
+</body>
+</html>
